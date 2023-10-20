@@ -22,9 +22,9 @@ spec:
           title: Repo Owner
           type: string
           description: GitLab Organization
-          default: {{ gitlab_destination_group }}
+          default: development
           enum:
-            - {{ gitlab_destination_group }}
+            - development
         description:
           title: Description
           type: string
@@ -62,20 +62,20 @@ spec:
         url: ./skeleton
         targetPath: ./source
         values:
-          git_host: {{ gitlab_host }}
-          gitlabGroup: {{ '${{parameters.gitlabGroup}}' }}
-          repoName: {{ '${{parameters.namespace}}' }}-backend
-          owner: {{ '${{user.entity.metadata.name}}' }}
-          cluster_id: {{ cluster_subdomain }}
-          namespace: {{ '${{parameters.namespace}}' }}
-          component_id: {{ '${{parameters.namespace}}' }}-poi-backend-app
+          git_host: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com
+          gitlabGroup: ${{parameters.gitlabGroup}}
+          repoName: ${{parameters.namespace}}-backend
+          owner: ${{user.entity.metadata.name}}
+          cluster_id: .apps.cluster-8ztgg.sandbox2426.opentlc.com
+          namespace: ${{parameters.namespace}}
+          component_id: ${{parameters.namespace}}-poi-backend-app
     - id: publishSource
       name: Publishing to Source Code Repository
       action: publish:gitlab
       input:
         sourcePath: ./source
-        description: {{ '${{parameters.description}}' }}
-        repoUrl: {{ gitlab_host }}?owner={{ '${{parameters.gitlabGroup}}' }}&repo={{ '${{parameters.namespace}}' }}-backend
+        description: ${{parameters.description}}
+        repoUrl: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com?owner=${{parameters.gitlabGroup}}&repo=${{parameters.namespace}}-backend
         defaultBranch: main
         protectDefaultBranch: false
         repoVisibility: public
@@ -83,7 +83,7 @@ spec:
       name: Registering the Source Code Component
       action: catalog:register
       input:
-        repoContentsUrl: {{ '${{steps.publishSource.output.repoContentsUrl}}' }}
+        repoContentsUrl: ${{steps.publishSource.output.repoContentsUrl}}
         catalogInfoPath: /catalog-info.yaml
     - id: templateGitops
       name: Generating the deployment resources and artefacts
@@ -92,26 +92,26 @@ spec:
         url: ./manifests
         copyWithoutTemplating: []
         values:
-          git_host: {{ gitlab_host }}
-          component_id: {{ '${{parameters.namespace}}' }}-poi-backend-app
-          description: {{ '${{parameters.description}}' }}
-          destination: https://{{ gitlab_host }}/{{ '${{parameters.gitlabGroup}}' }}/{{ '${{parameters.namespace}}' }}-backend-gitops.git
-          source_repository: https://{{ gitlab_host }}/{{ '${{parameters.gitlabGroup}}' }}/{{ '${{parameters.namespace}}' }}-backend.git
-          repository_name: {{ '${{parameters.namespace}}' }}-backend
-          git_owner: {{ '${{parameters.gitlabGroup}}' }}
-          cluster: {{ cluster_subdomain }}
-          namespace: {{ '${{parameters.namespace}}' }}
-          image_host: {{ '${{parameters.image_host}}' }}
-          image_name: {{ '${{parameters.namespace}}' }}/poi-backend-app
-          image_tag: {{ '${{parameters.image_tag}}' }}
+          git_host: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com
+          component_id: ${{parameters.namespace}}-poi-backend-app
+          description: ${{parameters.description}}
+          destination: https://gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-backend-gitops.git
+          source_repository: https://gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-backend.git
+          repository_name: ${{parameters.namespace}}-backend
+          git_owner: ${{parameters.gitlabGroup}}
+          cluster: .apps.cluster-8ztgg.sandbox2426.opentlc.com
+          namespace: ${{parameters.namespace}}
+          image_host: ${{parameters.image_host}}
+          image_name: ${{parameters.namespace}}/poi-backend-app
+          image_tag: ${{parameters.image_tag}}
         targetPath: ./tenant-gitops
     - id: publishGitops
       name: Publishing to Deployment Resource Repository
       action: publish:gitlab
       input:
-        repoUrl: {{ gitlab_host }}?owner={{ '${{parameters.gitlabGroup}}' }}&repo={{ '${{parameters.namespace}}' }}-backend-gitops
-        title: gitops resources for {{ '${{parameters.namespace}}' }}-poi-backend-app
-        description: gitops resources for {{ '${{parameters.namespace}}' }}-poi-backend-app
+        repoUrl: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com?owner=${{parameters.gitlabGroup}}&repo=${{parameters.namespace}}-backend-gitops
+        title: gitops resources for ${{parameters.namespace}}-poi-backend-app
+        description: gitops resources for ${{parameters.namespace}}-poi-backend-app
         sourcePath: ./tenant-gitops
         defaultBranch: main
         protectDefaultBranch: false
@@ -120,17 +120,17 @@ spec:
       name: Create ArgoCD Resources
       action: argocd:create-resources
       input:
-        appName: {{ '${{parameters.namespace}}' }}-poi-backend-app-bootstrap
+        appName: ${{parameters.namespace}}-poi-backend-app-bootstrap
         argoInstance: main
         namespace: janus-argocd
-        repoUrl: https://{{ gitlab_host }}/{{ '${{parameters.gitlabGroup}}' }}/{{ '${{parameters.namespace}}' }}-backend-gitops.git
+        repoUrl: https://gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-backend-gitops.git
         path: 'argocd/'
   output:
     links:
       - title: Source Code Repository
-        url: {{ '${{steps.publishSource.output.remoteUrl}}' }}
+        url: ${{steps.publishSource.output.remoteUrl}}
       - title: Pipeline status
-        url: https://console-openshift-console{{ cluster_subdomain }}/dev-pipelines/ns/{{ '${{parameters.namespace}}' }}/
+        url: https://console-openshift-console.apps.cluster-8ztgg.sandbox2426.opentlc.com/dev-pipelines/ns/${{parameters.namespace}}/
       - title: Open Component in catalog
         icon: catalog
-        entityRef: {{ '${{steps.registerSource.output.entityRef}}' }}
+        entityRef: ${{steps.registerSource.output.entityRef}}
