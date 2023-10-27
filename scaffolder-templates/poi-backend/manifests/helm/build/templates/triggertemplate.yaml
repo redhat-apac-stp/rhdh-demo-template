@@ -43,3 +43,7 @@ spec:
                     storage: 1Gi
           - emptyDir: {}
             name: maven-settings
+          
+          - name: secrets
+            secret:
+              secretName: gpg-public-key

@@ -33,9 +33,22 @@ spec:
       workspaces:
         - name: output
           workspace: source-folder
+
+    - name: verify-source
+      runAfter:
+      - git-clone
+      taskRef:
+        kind: Task
+        name: verify-source-code
+      workspaces:
+      - name: repository
+        workspace: source-folder
+      - name: secrets
+        workspace: secrets
+
     - name: package
       runAfter:
-        - git-clone
+        - verify-source
       taskRef:
         kind: ClusterTask
         name: maven
