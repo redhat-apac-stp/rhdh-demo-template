@@ -9,6 +9,7 @@ metadata:
     - quarkus
     - maven
     - workshop
+    - devsecops
 spec:
   owner: rhdeveloper-workshop-authors
   type: service
