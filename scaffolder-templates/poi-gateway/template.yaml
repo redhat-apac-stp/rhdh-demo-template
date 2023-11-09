@@ -62,11 +62,11 @@ spec:
         url: ./skeleton
         targetPath: ./source
         values:
-          git_host: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com
+          git_host: gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com
           gitlabGroup: ${{parameters.gitlabGroup}}
           repoName: ${{parameters.namespace}}-gateway
           owner: ${{user.entity.metadata.name}}
-          cluster_id: .apps.cluster-8ztgg.sandbox2426.opentlc.com
+          cluster_id: .apps.cluster-b7ht4.sandbox199.opentlc.com
           namespace: ${{parameters.namespace}}
           component_id: ${{parameters.namespace}}-poi-gateway-app
     - id: publishSource
@@ -75,7 +75,7 @@ spec:
       input:
         sourcePath: ./source
         description: ${{parameters.description}}
-        repoUrl: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com?owner=${{parameters.gitlabGroup}}&repo=${{parameters.namespace}}-gateway
+        repoUrl: gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com?owner=${{parameters.gitlabGroup}}&repo=${{parameters.namespace}}-gateway
         defaultBranch: main
         protectDefaultBranch: false
         repoVisibility: public
@@ -92,14 +92,14 @@ spec:
         url: ./manifests
         copyWithoutTemplating: []
         values:
-          git_host: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com
+          git_host: gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com
           component_id: ${{parameters.namespace}}-poi-gateway-app
           description: ${{parameters.description}}
-          destination: https://gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-gateway-gitops.git
-          source_repository: https://gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-gateway.git
+          destination: https://gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-gateway-gitops.git
+          source_repository: https://gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-gateway.git
           repository_name: ${{parameters.namespace}}-gateway
           git_owner: ${{parameters.gitlabGroup}}
-          cluster: .apps.cluster-8ztgg.sandbox2426.opentlc.com
+          cluster: .apps.cluster-b7ht4.sandbox199.opentlc.com
           namespace: ${{parameters.namespace}}
           image_host: ${{parameters.image_host}}
           image_name: ${{parameters.namespace}}/poi-gateway-app
@@ -109,7 +109,7 @@ spec:
       name: Publishing to Deployment Resource Repository
       action: publish:gitlab
       input:
-        repoUrl: gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com?owner=${{parameters.gitlabGroup}}&repo=${{parameters.namespace}}-gateway-gitops
+        repoUrl: gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com?owner=${{parameters.gitlabGroup}}&repo=${{parameters.namespace}}-gateway-gitops
         title: gitops resources for ${{parameters.namespace}}-poi-gateway-app
         description: gitops resources for ${{parameters.namespace}}-poi-gateway-app
         sourcePath: ./tenant-gitops
@@ -123,7 +123,7 @@ spec:
         appName: ${{parameters.namespace}}-poi-gateway-app-bootstrap
         argoInstance: main
         namespace: janus-argocd
-        repoUrl: https://gitlab-gitlab.apps.cluster-8ztgg.sandbox2426.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-gateway-gitops.git
+        repoUrl: https://gitlab-gitlab.apps.cluster-b7ht4.sandbox199.opentlc.com/${{parameters.gitlabGroup}}/${{parameters.namespace}}-gateway-gitops.git
         path: 'argocd/'
   output:
     links:
