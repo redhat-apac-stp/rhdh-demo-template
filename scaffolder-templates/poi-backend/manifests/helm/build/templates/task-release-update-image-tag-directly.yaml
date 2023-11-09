@@ -1,0 +1,69 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: update-release-image-tag
+spec:
+  description: This task updates the manifest for the current application to point
+    to the image tag created with the short commit.
+  params:
+  - description: Used to tag the built image.
+    name: image_tag
+    type: string
+  - default: main
+    description: Target branch to push to
+    name: target-branch
+    type: string
+  - default: Tekton Pipeline
+    description: Git user name for performing the push operation.
+    name: git_user_name
+    type: string
+  - default: tekton@tekton.com
+    description: Git user email for performing the push operation.
+    name: git_user_email
+    type: string
+  - description: File in which the image configuration is stored.
+    name: configuration_file
+    type: string
+  - description: Repo in which the image configuration is stored.
+    name: repository
+    type: string
+  - default: alpine/git:latest
+  #Todo fix this later
+  # - default: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:aa2599a70c14b4f30c9959f6ddafc2510180764d9464e6e2ec5f2147a0a0bf80
+    description: The image providing the git-init binary that this Task runs.
+    name: gitInitImage
+  steps:
+  - image: "$(params.gitInitImage)"
+    name: git
+    script: |
+      echo $HOME
+      if [ "$(workspaces.basic-auth.bound)" = "true" ] ; then
+        cp "$(workspaces.basic-auth.path)/.git-credentials" "${HOME}/.git-credentials"
+        cp "$(workspaces.basic-auth.path)/.gitconfig" "${HOME}/.gitconfig"
+        chmod 400 "${HOME}/.git-credentials"
+        chmod 400 "${HOME}/.gitconfig"
+      fi
+      # Setting up the git config.
+      git config --global user.email "$(params.git_user_email)"
+      git config --global user.name "$(params.git_user_name)"
+
+      # Checkout target branch to avoid the detached HEAD state
+      TMPDIR=$(mktemp -d)
+
+      cd $TMPDIR
+      git clone -b $(params.target-branch) --single-branch $(params.repository) source
+      cd source
+
+      # Set to the short commit value passed as parameter.
+      # Notice the enclosing " to keep it as a string in the resulting YAML.
+      IMAGE_TAG=\"$(params.image_tag)\"
+
+      sed -i "s/^  tag: .*/  tag: ${IMAGE_TAG}/" $(params.configuration_file)
+
+      git add $(params.configuration_file)
+      git commit -m "Automatically updated manifest to point to image tag $IMAGE_TAG"
+      git push origin $(params.target-branch)
+  workspaces:
+  - description: A workspace containing a .gitconfig and .git-credentials file.
+    name: basic-auth
+    optional: true

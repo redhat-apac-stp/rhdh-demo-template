@@ -3,37 +3,171 @@ apiVersion: triggers.tekton.dev/v1alpha1
 kind: TriggerTemplate
 metadata:
   name: {{ .Values.app.name }}-run-pipeline
+# spec:
+#   params:
+#     - name: git-revision
+#       description: The git revision
+#       default: {{ .Values.git.branch }}
+#     - name: git-repo-url
+#       description: The repo url
+#     - name: output-image
+#       description: reference of the image that will get created
+#       default: {{ include "image.url" . }}
+#   resourcetemplates:
+#     - apiVersion: tekton.dev/v1beta1
+#       kind: PipelineRun
+#       metadata:
+#         generateName: {{ .Values.app.name }}-
+#         labels:
+#           backstage.io/kubernetes-id: ${{values.component_id}}
+#       spec:
+#         params:
+#           - name: source-repo
+#             value: $(tt.params.git-repo-url)
+#           - name: source-branch
+#             value: $(tt.params.git-revision)
+#           - name: output-image
+#             value: $(tt.params.output-image)
+#         pipelineRef:
+#           name: {{ .Values.app.name }}-pipeline
+#         serviceAccountName: pipeline
+#         timeout: 1h0m0s
+#         workspaces:
+#           - name: source-folder
+#             volumeClaimTemplate:
+#               spec:
+#                 accessModes:
+#                   - ReadWriteOnce
+#                 resources:
+#                   requests:
+#                     storage: 1Gi
+#           - emptyDir: {}
+#             name: maven-settings
+          
+#           - name: secrets
+#             secret:
+#               secretName: gpg-public-key
 spec:
   params:
-    - name: git-revision
-      description: The git revision
-      default: {{ .Values.git.branch }}
-    - name: git-repo-url
-      description: The repo url
-    - name: output-image
-      description: reference of the image that will get created
-      default: {{ include "image.url" . }}
+  - name: source_repo_url
+    description: source repo that contains the application code
+  - name: source_repo_name
+    description: source repo that contains the application code
+
+  - name: source_repo_owner
+    description: source repo owner or organization depending how you call it
+
+  - name: source_git_revision
+    description: source branch to build from
+    
+  - name: maven_mirror_url
+
+  - name: sonarqube_host_url
+    
+  - name: sonarqube_project_key
+    
+  - name: sonarqube_project_secret
+
+  - name: tls_verify
+    
+  - name: git_ref
+    
+  - name: commit_date
+    
+  - name: commit_author
+    
+  - name: commit_message
+    
+  - name: image_repo
+
+  - name: image_test_repo
+    
+  - name: image_tag
+
+  - name: cyclonedx_host_url
+
+  - name: release_dev_helm_dir
+
+  - name: release_dev_values_file
+
+  - name: release_test_helm_dir
+
+  - name: release_test_values_file
+
+  - name: gitops_repo_url
+
+  - name: gitops_target_branch
+    
   resourcetemplates:
     - apiVersion: tekton.dev/v1beta1
       kind: PipelineRun
       metadata:
-        generateName: {{ .Values.app.name }}-
-        labels:
-          backstage.io/kubernetes-id: ${{values.component_id}}
+        name: $(uid)
       spec:
         params:
-          - name: source-repo
-            value: $(tt.params.git-repo-url)
-          - name: source-branch
-            value: $(tt.params.git-revision)
-          - name: output-image
-            value: $(tt.params.output-image)
+          - name: source_repo_url
+            value: "{{ .Values.build.git.source_repo_url }}"
+          - name: source_repo_name
+            value: "{{ .Values.build.git.repo_name }}"
+          - name: source_repo_owner
+            value: "{{ .Values.build.git.repo_owner }}"
+          - name: source_git_revision
+            value: $(tt.params.source_git_revision)
+          - name: maven_mirror_url
+            value: $(tt.params.maven_mirror_url)
+          - name: sonarqube_host_url
+            value: $(tt.params.sonarqube_host_url)
+          - name: sonarqube_project_key
+            value: "{{ .Values.build.git.repo_name }}"
+          - name: sonarqube_project_secret
+            value: sonarqube-access-token
+          - name: tls_verify
+            value: true
+          - name: git_ref
+            value: $(tt.params.git_ref)
+          - name: commit_date
+            value: $(tt.params.commit_date)
+          - name: commit_author
+            value: $(tt.params.commit_author)
+          - name: commit_message
+            value: $(tt.params.commit_message)
+          - name: image_repo
+            # value: $(tt.params.image_repo)
+            value: {{ .Values.build.image.repository }}
+          - name: image_test_repo
+            value: $(tt.params.image_test_repo)
+          - name: image_tag
+            value: $(tt.params.git_ref)-$(tt.params.source_git_revision)
+          - name: cyclonedx_host_url
+            value: $(tt.params.cyclonedx_host_url)
+          - name: release_dev_helm_dir
+            value: {{ .Values.release.dev.helm_dir }}
+          - name: release_dev_values_file
+            value: {{ .Values.release.dev.values_file }}
+          - name: release_test_helm_dir
+            value: {{ .Values.release.test.helm_dir }}
+          - name: release_test_values_file
+            value: {{ .Values.release.test.values_file }}
+          - name: gitops_repo_url
+            value: {{ .Values.build.git.gitops_repo_url }}
+          - name: gitops_target_branch
+            value: {{ .Values.build.git.gitops_target_branch }}
+
         pipelineRef:
-          name: {{ .Values.app.name }}-pipeline
+          name: '{{.Values.build.git.repo_name}}-pipeline'
         serviceAccountName: pipeline
         timeout: 1h0m0s
         workspaces:
-          - name: source-folder
+        # Static pvc for better build performance
+          # - name: workspace
+          #   persistentVolumeClaim:
+          #     claimName: "{{.Values.build.git.repo_name}}-build-pvc"
+          # - name: maven-settings
+          #   emptyDir: {}
+          # - name: maven-local-repo
+          #   persistentVolumeClaim:
+          #     claimName: "{{.Values.build.git.repo_name}}-m2repo-pvc"
+          - name: workspace
             volumeClaimTemplate:
               spec:
                 accessModes:
@@ -41,9 +175,18 @@ spec:
                 resources:
                   requests:
                     storage: 1Gi
-          - emptyDir: {}
-            name: maven-settings
-          
+          - name: maven-settings
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 2Gi
+            # emptyDir: {}
+          - name: gitcredential
+            secret:
+              secretName: '{{.Values.build.git.repo_name}}-github-pat'
           - name: secrets
             secret:
               secretName: gpg-public-key

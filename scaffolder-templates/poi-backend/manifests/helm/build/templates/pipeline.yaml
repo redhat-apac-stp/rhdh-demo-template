@@ -6,70 +6,337 @@ metadata:
   labels:
     type: pipeline
     backstage.io/kubernetes-id: ${{values.component_id}}
+# spec:
+#   params:
+#     - name: source-repo
+#       description: source repo that contains the application code
+#       type: string
+#       default: {{ .Values.git.repo }}
+#     - name: source-branch
+#       description: source branch to build from
+#       default: {{ .Values.git.branch }}
+#       type: string
+#     - name: output-image
+#       description: reference of the image that will get created
+#       default: {{ include "image.url" . }}
+#       type: string
+#   tasks:
+#     - name: git-clone
+#       params:
+#         - name: url
+#           value: $(params.source-repo)
+#         - name: revision
+#           value: $(params.source-branch)
+#       taskRef:
+#         kind: ClusterTask
+#         name: git-clone
+#       workspaces:
+#         - name: output
+#           workspace: source-folder
+
+#     - name: verify-source
+#       runAfter:
+#       - git-clone
+#       taskRef:
+#         kind: Task
+#         name: verify-source-code
+#       workspaces:
+#       - name: repository
+#         workspace: source-folder
+#       - name: secrets
+#         workspace: secrets
+
+#     - name: package
+#       runAfter:
+#         - verify-source
+#       taskRef:
+#         kind: ClusterTask
+#         name: maven
+#       workspaces:
+#         - name: source
+#           workspace: source-folder
+#         - name: maven-settings
+#           workspace: maven-settings
+#     - name: build-and-push
+#       params:
+#         - name: IMAGE
+#           value: $(params.output-image)
+#       runAfter:
+#         - package
+#       taskRef:
+#         kind: Task
+#         name: kaniko-backend
+#       workspaces:
+#         - name: source
+#           workspace: source-folder
+#   workspaces:
+    # - name: source-folder
+    # - name: maven-settings
+    # - name: secrets
 spec:
   params:
-    - name: source-repo
-      description: source repo that contains the application code
-      type: string
-      default: {{ .Values.git.repo }}
-    - name: source-branch
-      description: source branch to build from
-      default: {{ .Values.git.branch }}
-      type: string
-    - name: output-image
-      description: reference of the image that will get created
-      default: {{ include "image.url" . }}
-      type: string
+  - name: source_repo_url
+    description: source repo that contains the application code
+    type: string
+  - name: source_repo_name
+    description: source repo name
+    type: string
+  - name: source_repo_owner
+    description: source repo organization name
+    type: string
+  - name: source_git_revision
+    description: source branch to build from
+    type: string
+
+  - name: maven_mirror_url
+    type: string
+
+  - name: sonarqube_host_url
+    type: string
+  - name: sonarqube_project_key
+    type: string
+  - name: sonarqube_project_secret
+    type: string
+
+  - name: tls_verify
+    type: string
+  - name: git_ref
+    type: string
+  - name: commit_date
+    type: string
+  - name: commit_author
+    type: string
+  - name: commit_message
+    type: string
+  - name: image_repo
+    type: string
+  - name: image_test_repo
+    type: string
+  - name: image_tag
+    type: string
+  - name: cyclonedx_host_url
+    type: string
+  - name: release_dev_helm_dir
+    type: string
+  - name: release_dev_values_file
+    type: string
+  - name: release_test_helm_dir
+    type: string
+  - name: release_test_values_file
+    type: string
+
+  - name: gitops_repo_url
+    type: string
+  - name: gitops_target_branch
+    type: string
+
   tasks:
-    - name: git-clone
-      params:
-        - name: url
-          value: $(params.source-repo)
-        - name: revision
-          value: $(params.source-branch)
-      taskRef:
-        kind: ClusterTask
-        name: git-clone
-      workspaces:
-        - name: output
-          workspace: source-folder
-
-    - name: verify-source
-      runAfter:
-      - git-clone
-      taskRef:
-        kind: Task
-        name: verify-source-code
-      workspaces:
-      - name: repository
-        workspace: source-folder
-      - name: secrets
-        workspace: secrets
-
-    - name: package
-      runAfter:
-        - verify-source
-      taskRef:
-        kind: ClusterTask
-        name: maven
-      workspaces:
-        - name: source
-          workspace: source-folder
-        - name: maven-settings
-          workspace: maven-settings
-    - name: build-and-push
-      params:
-        - name: IMAGE
-          value: $(params.output-image)
-      runAfter:
-        - package
-      taskRef:
-        kind: Task
-        name: kaniko-backend
-      workspaces:
-        - name: source
-          workspace: source-folder
-  workspaces:
-    - name: source-folder
-    - name: maven-settings
+  - name: fetch-source
+    params:
+    - name: url
+      value: $(params.source_repo_url)
+    - name: revision
+      value: $(params.source_git_revision)
+    - name: deleteExisting
+      value: "true"
+    taskRef:
+      kind: ClusterTask
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: workspace
+    - name: basic-auth
+      workspace: gitcredential
+  
+  - name: verify-source
+    runAfter:
+    - fetch-source
+    taskRef:
+      kind: Task
+      name: verify-source-code
+    workspaces:
+    - name: repository
+      workspace: workspace
     - name: secrets
+      workspace: secrets
+
+  - name: package
+    params:
+      - name: MAVEN_IMAGE
+        value: '{{ .Values.build.maven.maven_builder_image }}'
+      - name: MAVEN_MIRROR_URL
+        value: $(params.maven_mirror_url)
+      - name: GOAL
+        value: "package"
+    runAfter:
+      - verify-source
+      # - fetch-source
+    taskRef:
+      kind: Task
+      name: maven
+    workspaces:
+      - name: source
+        workspace: workspace
+      - name: maven-settings
+        workspace: maven-settings
+      - name: maven-local-repo
+        workspace: maven-local-repo
+  
+  - name: scan-source
+    params:
+      - name: SONARQUBE_HOST_URL
+        value: $(params.sonarqube_host_url)
+      - name: sonarqube_project_key
+        value: $(params.sonarqube_project_key)
+      - name: sonarqubeProjectSecret
+        value: $(params.sonarqube_project_secret)
+    runAfter:
+      - package
+    taskRef:
+      kind: Task
+      name: scan-code
+    workspaces:
+      - name: repository
+        workspace: workspace
+
+  - name: build
+    retries: 1
+    params:
+    - name: tls_verify
+      value: $(params.tls_verify)
+    - name: BUILD_EXTRA_ARGS
+      value: --label=io.openshift.build.commit.author='$(params.commit_author)' --label=io.openshift.build.commit.date='$(params.commit_date)'
+        --label=io.openshift.build.commit.id='$(params.source_git_revision)' --label=io.openshift.build.commit.message='$(params.commit_message)'
+        --label=io.openshift.build.commit.ref='$(params.git_ref)' --ulimit=nofile=4096:4096
+    - name: IMAGE
+      value: $(params.image_repo):$(params.image_tag)
+    runAfter:
+    - scan-source
+    # - package
+    taskRef:
+      kind: ClusterTask
+      name: buildah
+    workspaces:
+    - name: source
+      workspace: workspace
+
+  - name: acs-image-scan
+    params:
+    - name: rox_central_endpoint
+      value: rox-central-endpoint
+    - name: rox_api_token
+      value: rox-api-token
+    - name: image
+      value: $(params.image_repo):$(params.image_tag)
+    - name: insecure-skip-tls-verify
+      value: "true"
+    runAfter:
+    - build
+    taskRef:
+      kind: Task
+      name: acs-image-scan
+
+  - name: acs-image-check
+    params:
+    - name: rox_central_endpoint
+      value: rox-central-endpoint
+    - name: rox_api_token
+      value: rox-api-token
+    - name: image
+      value: $(params.image_repo):$(params.image_tag)
+    - name: insecure-skip-tls-verify
+      value: "true"
+    runAfter:
+    - acs-image-scan
+    taskRef:
+      kind: Task
+      name: acs-image-check
+
+  - name: generate-sbom
+    params:
+    - name: cyclonedxHostUrl
+      value: $(params.cyclonedx_host_url)
+    runAfter:
+    - build
+    taskRef:
+      kind: Task
+      name: generate-sbom
+    workspaces:
+    - name: repository
+      workspace: workspace
+
+  - name: acs-deploy-check
+    params:
+      - name: rox_central_endpoint
+        value: rox-central-endpoint
+      - name: rox_api_token
+        value: rox-api-token
+      - name: gitRepositoryUrl
+        value: $(params.gitops_repo_url)
+      - name: gitRepositoryRevision
+        value: main
+      - name: insecure-skip-tls-verify
+        value: 'true'
+      - name: releaseHelmDir
+        value: '$(params.release_dev_helm_dir)'
+      - name: releaseAppName
+        value: '$(params.source_repo_name)'
+      - name: releaseHelmValuesFilePath
+        value: '$(params.release_dev_values_file)'
+    runAfter:
+    - acs-image-check
+    - generate-sbom
+    taskRef:
+      kind: Task
+      name: acs-deploy-check
+    workspaces:
+    - name: basic-auth
+      workspace: gitcredential
+
+  - name: update-dev-release-image-tag
+    params:
+    - name: image_tag
+      value: $(params.image_tag)
+    - name: configuration_file
+      value: $(params.release_dev_helm_dir)/$(params.release_dev_values_file)
+    - name: repository
+      value: $(params.gitops_repo_url)
+    - name: target-branch
+      value: $(params.gitops_target_branch)
+    runAfter:
+    - acs-deploy-check
+    taskRef:
+      kind: Task
+      name: update-release-image-tag
+    workspaces:
+    - name: basic-auth
+      workspace: gitcredential
+
+  - name: create-test-release-pr-branch
+    params:
+    - name: image_tag
+      value: $(params.image_tag)
+    - name: configuration_file
+      value: $(params.release_test_helm_dir)/$(params.release_test_values_file)
+    - name: repository
+      value: $(params.gitops_repo_url)
+    - name: target-branch
+      value: $(params.gitops_target_branch)
+    - name: pr-branch
+      value: feature-for-$(params.source_git_revision)
+    runAfter:
+    - acs-deploy-check
+    taskRef:
+      kind: Task
+      name: create-pr-release-branch
+    workspaces:
+    - name: basic-auth
+      workspace: gitcredential
+
+
+  workspaces:
+  - name: workspace
+  - name: maven-settings
+  - name: maven-local-repo
+  - name: gitcredential
+  - name: secrets

@@ -1,0 +1,177 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: acs-deploy-check
+spec:
+  description: >-
+    Policy check a deployment with StackRox/RHACS This tasks allows you to check
+    a deployment against build-time policies and apply enforcement to fail
+    builds. It's a companion to the stackrox-image-scan task, which returns full
+    vulnerability scan results for an image.
+  params:
+    - description: |
+        Secret containing the address:port tuple for StackRox Central)
+        (example - rox.stackrox.io:443)
+      name: rox_central_endpoint
+      type: string
+    - description: Secret containing the StackRox API token with CI permissions
+      name: rox_api_token
+      type: string
+    - default: >-
+        https://dev-user:openshift@gitea.apps.cluster-5khxf.5khxf.sandbox2563.opentlc.com/dev-user/securing-software-supply-chain.git
+      name: gitRepositoryUrl
+      type: string
+    - default: main
+      name: gitRepositoryRevision
+      type: string
+    - default: 'true'
+      name: verbose
+      type: string
+    - default: 'false'
+      description: |
+        When set to `"true"`, skip verifying the TLS certs of the Central
+        endpoint.  Defaults to `"false"`.
+      name: insecure-skip-tls-verify
+      type: string
+    # - default: registry.redhat.io/openshift-pipelines/pipelines-git-init-rhel8@sha256:aa2599a70c14b4f30c9959f6ddafc2510180764d9464e6e2ec5f2147a0a0bf80
+    - default: alpine/git:latest
+      description: The image providing the git-init binary that this Task runs.
+      name: gitInitImage
+    - default: docker.io/lachlanevenson/k8s-helm@sha256:5c792f29950b388de24e7448d378881f68b3df73a7b30769a6aa861061fd08ae
+      description: Specify a specific helm image
+      name: helmImage
+      type: string
+    - default: values.yaml
+      description: Specify Helm chart values yaml filepath
+      name: releaseHelmValuesFilePath
+      type: string
+    - default: "test"
+      description: Specify Release Deployed App name
+      name: releaseAppName
+      type: string
+    - description: Specify Release Helm Chart Dir
+      name: releaseHelmDir
+      type: string
+  results:
+    - description: Output of `roxctl deployment check`
+      name: check_output
+  workspaces:
+  - description: A workspace containing a .gitconfig and .git-credentials file.
+    name: basic-auth
+    optional: true
+  steps:
+    - image: "$(params.gitInitImage)"
+      name: git-checkout
+      resources: {}
+      script: |
+        #!/usr/bin/env sh
+
+        # set -eu -o pipefail
+        echo $HOME
+        if [ "$(workspaces.basic-auth.bound)" = "true" ] ; then
+          cp "$(workspaces.basic-auth.path)/.git-credentials" "${HOME}/.git-credentials"
+          cp "$(workspaces.basic-auth.path)/.gitconfig" "${HOME}/.gitconfig"
+          chmod 400 "${HOME}/.git-credentials"
+          chmod 400 "${HOME}/.gitconfig"
+        fi
+
+        if [[ "$(params.verbose)" == "true" ]] ; then
+          set -x
+          echo "**** Cloning $(params.gitRepositoryUrl) into $(pwd)/repository"
+        fi
+
+        git clone -b "$(params.gitRepositoryRevision)" --single-branch "$(params.gitRepositoryUrl)" $(pwd)/repository
+        # cd repository
+      volumeMounts:
+        - mountPath: /workspace
+          name: repository
+      workingDir: /workspace
+
+    - image: "$(params.helmImage)"
+      name: helm-templating
+      resources: {}
+      script: |
+        #!/usr/bin/env sh
+        set -x
+        cd repository/"$(params.releaseHelmDir)"
+        helm template -f "$(params.releaseHelmValuesFilePath)" "$(params.releaseAppName)" . |tee "$(params.releaseAppName)"-deploy-manifest.yaml
+      volumeMounts:
+        - mountPath: /workspace
+          name: repository
+      workingDir: /workspace
+
+
+    # - image: quay.io/wpernath/kustomize-ubi
+    #   name: kustomize-build
+    #   resources: {}
+    #   script: |
+    #     #!/usr/bin/env sh
+
+    #     set -eu -o pipefail
+
+    #     cd repository/gitops/application/globex/overlays/dev
+
+    #     mkdir -p /workspace/repository/input
+    #     mkdir -p /workspace/repository/output
+
+    #     kustomize build . --output /workspace/repository/input/all.yaml
+    #   volumeMounts:
+    #     - mountPath: /workspace/repository
+    #       name: repository
+    #   workingDir: /workspace
+    # - image: looztra/kubesplit
+    #   name: kustomize-split
+    #   resources: {}
+    #   script: >
+    #     #!/usr/bin/env sh
+
+
+    #     set -eu -o pipefail
+
+    #     kubesplit -i /workspace/repository/input/all.yaml -o
+    #     /workspace/repository/output
+    #   volumeMounts:
+    #     - mountPath: /workspace/repository
+    #       name: repository
+    #   workingDir: /workspace
+    - env:
+        - name: ROX_API_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: rox_api_token
+              name: $(params.rox_api_token)
+        - name: ROX_CENTRAL_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              key: rox_central_endpoint
+              name: $(params.rox_central_endpoint)
+      image: 'registry.access.redhat.com/ubi8:8.7-1026'
+      name: rox-deploy-scan
+      resources: {}
+      script: |
+        #!/usr/bin/env bash
+        set -x
+
+        cd repository/"$(params.releaseHelmDir)"
+
+        curl -s -k -L -H "Authorization: Bearer $ROX_API_TOKEN" \
+          "https://$ROX_CENTRAL_ENDPOINT/api/cli/download/roxctl-linux" \
+          --output ./roxctl  \
+          > /dev/null
+
+        chmod +x ./roxctl  > /dev/null
+
+        # DEPLOYMENT_FILE=$(ls -1a | grep *deployment--globex-ui.yml)
+        DEPLOYMENT_FILE="$(params.releaseAppName)"-deploy-manifest.yaml
+
+        ./roxctl deployment check \
+         $( [ "$(params.insecure-skip-tls-verify)" = "true" ] && \
+         echo -n "--insecure-skip-tls-verify") \
+         -e "$ROX_CENTRAL_ENDPOINT" --file "$DEPLOYMENT_FILE"
+      volumeMounts:
+        - mountPath: /workspace
+          name: repository
+      workingDir: /workspace
+  volumes:
+    - emptyDir: {}
+      name: repository
