@@ -1,7 +1,7 @@
 apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
-  name: poi-backend-template
+  name: devsecops-poi-backend-template
   title: Quarkus Backend Application for Points-of-Interest Map
   description: Creates the quarkus poi backend app for the workshop
   tags:
