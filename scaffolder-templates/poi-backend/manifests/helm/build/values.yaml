@@ -6,6 +6,7 @@ app:
 git:
   branch: main
   repo: ${{values.source_repository}}
+  gitops_repo: ${{values.destination}}
   org: ${{values.git_owner}}
   name: ${{values.repository_name}}
   host: ${{values.git_host}}
@@ -16,3 +17,14 @@ image:
   host: ${{values.image_host}}
   name: ${{values.image_name}}
   tag: ${{values.image_tag}}
+
+release:
+  dev:
+    helm_dir: "helm/app"
+    values_file: "values-dev.yaml"
+  test:
+    helm_dir: "helm/app"
+    values_file: "values-test.yaml"
+  prod:
+    helm_dir: "helm/app"
+    values_file: "values-prod.yaml"

@@ -11,8 +11,18 @@ This gave you a  configured platform with many components which described on htt
 
 You need to login into the platform before run the ansible script:
 ```
-ansible-playbook template.yaml
+ansible-playbook devsecops-showcase.yaml
 ```
+
+Before ansible-script is ready, you might need to run manually:
+
+```
+kubectl create secret generic backstage-config \
+  --from-file=app-config.yaml=./app-config.yaml \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+```
+
 
 3) Trigger the template from the RHDH and pick up the template name ""
 

@@ -1,0 +1,21 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  creationTimestamp: null
+  name: gitlab-push-binding
+spec:
+  params:
+  - name: source_repo_url
+    value: $(body.repository.git_http_url)
+  - name: git-repo-name
+    value: $(body.repository.name)
+  - name: git_ref
+    value: $(extensions.ref)
+  - name: source_git_revision
+    value: $(body.checkout_sha)
+  - name: commit_date
+    value: $(body.head_commit.timestamp)
+  - name: commit_message
+    value: $(body.head_commit.message)
+  - name: commit_author
+    value: $(body.head_commit.author.name)
