@@ -1,0 +1,45 @@
+---
+- name: Gather Cluster Info.
+  gather_facts: false
+  hosts: 'localhost'
+  tasks:
+  - name: Determine Host
+    shell: "oc cluster-info | grep -Eo '.cluster(.*?).com'"
+    register: cluster_response
+  - name: Set cluster_base_url variable
+    set_fact:
+      cluster_base_url: "{{ cluster_response.stdout }}"
+  - debug: var=cluster_response.stdout_lines
+
+  - name: Fetch app-config.yaml from Kubernetes Secret
+    shell: "kubectl get secret backstage-config -n backstage -o=jsonpath='{.data.app-config\\.yaml}' | base64 --decode > {{ playbook_dir }}/app-config.yaml"
+    register: command_result
+
+  - name: Fail the playbook if the command fails
+    fail:
+      msg: "Failed to fetch app-config.yaml from the secret: {{ command_result.stderr }}"
+    when: command_result.rc != 0
+
+  - name: Replace cluster-*.opentlc.com with {{ cluster_base_url }}
+    replace:
+      path: "{{ playbook_dir }}/app-config.yaml"
+      regexp: 'cluster-\*.opentlc.com'
+      replace: "{{ cluster_base_url }}"
+
+  - name: Replace with hcap template
+    replace:
+      path: "{{ playbook_dir }}/app-config.yaml"
+      regexp: 'https://[^/]+/rhdh/software-templates/blob/main/showcase-templates.yaml'
+      replace: "https://github.com/redhat-apac-stp/rhdh-demo-template/blob/main/showcase-templates.yaml"
+
+  - name: Update the Kubernetes Secret
+    k8s:
+      state: present
+      definition:
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: backstage-config
+          namespace: backstage
+        data:
+          app-config.yaml: "{{ lookup('file', playbook_dir + '/app-config.yaml') | b64encode }}"
