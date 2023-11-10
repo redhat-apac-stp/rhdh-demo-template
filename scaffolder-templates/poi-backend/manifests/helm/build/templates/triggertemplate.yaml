@@ -87,7 +87,7 @@ spec:
             value: $(tt.params.commit_message)
           - name: image_repo
             # value: $(tt.params.image_repo)
-            value: { .Values.image.host }}/
+            value: {{ .Values.image.host }}/
 {{ .Values.image.name }}
           - name: image_test_repo
             value: $(tt.params.image_test_repo)
